@@ -71,7 +71,7 @@ def train_crossval_loop(
     oof_preds = []
     validation_targets = []
     for i, (ds_train, ds_val) in enumerate(split_dataset(dataset,num_folds)):
-        model = model_class(input_channels, nb_classes)
+        model = model_class(input_channels, nb_classes, dim = 3)
         dataloader_train = torch.utils.data.DataLoader(
             ds_train, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
         )
