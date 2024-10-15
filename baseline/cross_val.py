@@ -30,10 +30,6 @@ Model takes
 X shape (B,T,C,L,H)
 Y shape (B, L, H)
 """
-data_folder=Path(
-    Path("DATA-mini")
-)
-dataset = BaselineDataset(data_folder)
 
 
 
@@ -52,18 +48,24 @@ def train_crossval_loop(
     model_class : torch.nn.modules.module.Module,
     nb_classes: int,
     input_channels: int,
+    data_folder: str, 
     num_folds : int = 5,
     num_epochs: int = 10,
     batch_size: int = 4,
     learning_rate: float = 1e-3,
     device: str = "cpu",
     verbose: bool = False,
-) -> SimpleSegmentationModel:
+):
     """
     Training Loop. No cross validation. Must provide the datasets for training and validation
     Args: 
     - model : should be a PyTorch that accepts (B, T, C, L, H) and returns (B, 20, L, H)
     """
+    data_folder=Path(
+        data_folder
+    )
+    assert data_folder.exists()
+    dataset = BaselineDataset(data_folder)
     criterion = nn.CrossEntropyLoss()
     results_folds = defaultdict(list)
     oof_preds = []
@@ -170,29 +172,22 @@ def train_crossval_loop(
     print("Training complete.")
     return model, results_folds, mean_iou_cv
 # %%
+if __name__ == "__main__" : 
+    # how to split accurately
+    # grouped split 
+    folds = 5 
+    batch_size = 10 
 
-# how to split accurately
-# grouped split 
-folds = 5 
-batch_size = 10 
-dataset.meta_patch
+    # lets try the cross val function above
 
-# lets try the cross val function above
+    input_channels = 10 
+    nb_classes = 20
 
-input_channels = 10 
-nb_classes = 20
+    model, results_folds, mean_iou_cv = train_crossval_loop(
+        model_class = SimpleSegmentationModelWrapper,
+        nb_classes=20,
+        input_channels= 10,
+        batch_size=1,
+        num_epochs= 1
+    )
 
-model, results_folds, mean_iou_cv = train_crossval_loop(
-    model_class = SimpleSegmentationModelWrapper,
-    nb_classes=20,
-    input_channels= 10,
-    batch_size=1,
-    num_epochs= 1
-)
-
-# %% 
-
-# model = UNet(in_channels = 10, out_channels = 20, dim = 3)
-# sample_input = torch.randn(13,41,10, 128,128)
-# output = model(sample_input)
-# outputs_median_time = torch.median(output,2).values
