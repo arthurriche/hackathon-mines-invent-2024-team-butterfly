@@ -1,23 +1,26 @@
 """
 Baseline Pytorch Dataset
 """
-
+# %%
 import os
 from pathlib import Path
 
 import geopandas as gpd
+import pandas as pd 
 import numpy as np
 import torch
 
 
 class BaselineDataset(torch.utils.data.Dataset):
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, max_samples: int | None = None):
         super(BaselineDataset, self).__init__()
         self.folder = folder
 
         # Get metadata
         print("Reading patch metadata ...")
-        self.meta_patch = gpd.read_file(os.path.join(folder, "metadata.geojson"))
+        self.meta_patch:pd.DataFrame = gpd.read_file(os.path.join(folder, "metadata.geojson"))
+        if max_samples is not None: 
+            self.meta_patch = self.meta_patch.sample(max_samples)
         self.meta_patch.index = self.meta_patch["ID"].astype(int)
         self.meta_patch.sort_index(inplace=True)
         print("Done.")
@@ -47,3 +50,7 @@ class BaselineDataset(torch.utils.data.Dataset):
         target = torch.from_numpy(target[0].astype(int))
 
         return data, target
+
+
+# %% 
+
