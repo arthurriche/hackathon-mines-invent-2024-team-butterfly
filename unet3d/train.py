@@ -101,7 +101,7 @@ def train_model(
             optimizer.zero_grad()
 
             # Forward pass
-            outputs = model(inputs["S2"],1) 
+            outputs = model(inputs["S2"]) 
             outputs_median_time = torch.median(outputs,2).values
 
             # Loss computation
