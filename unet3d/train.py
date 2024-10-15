@@ -87,7 +87,7 @@ def train_model(
     device = torch.device(device)
     model.to(device)
 
-    # Training loop
+    # Training loopx    
     for epoch in range(num_epochs):
         model.train()  # Set the model to training mode
         running_loss = 0.0
@@ -102,8 +102,9 @@ def train_model(
 
             # Forward pass
             outputs = model(inputs["S2"]) 
+            # OUTPUT SHAPE (B 20 T H W )
             outputs_median_time = torch.median(outputs,2).values
-
+            
             # Loss computation
             loss = criterion(outputs_median_time, targets)
 

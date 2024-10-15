@@ -19,12 +19,8 @@ from sklearn.metrics import jaccard_score
 from baseline.collate import pad_collate
 from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
-
-
-
-# %% 
-
-
+from utils.dummy_model import SimpleSegmentationModelWrapper
+from unet3d.unet3d import UNet
 
 
 
@@ -34,55 +30,11 @@ Model takes
 X shape (B,T,C,L,H)
 Y shape (B, L, H)
 """
-model = train_model(
-    data_folder=Path(
-       Path("DATA-mini")
-    ),
-    nb_classes=20,
-    input_channels=10,
-    num_epochs=100,
-    batch_size=32,
-    learning_rate=1e-3,
-    device="mps",
-    verbose=True,
-)
-
-# %%
-data = Path("DATA-mini") / "metadata.geojson"
-data.exists()
-
-# %%
-# understand the baseline dataset's getitem method
- 
-
-
 data_folder=Path(
     Path("DATA-mini")
 )
 dataset = BaselineDataset(data_folder)
-# %%
-x,y = dataset[0]
-# %%
 
-
-
-class SimpleSegmentationModelWrapper(nn.Module):
-    """
-    Wraps around the SimpleSegmentationModel
-    to go from (B,T,input_channels,L,H) -> (B,T,nb_classes,L,H)
-    """
-    def __init__(self, input_channels: int, nb_classes: int):
-        super().__init__()
-        self.input_channels = input_channels
-        self.nb_classes = nb_classes
-        self.base_model = SimpleSegmentationModel(input_channels, nb_classes)
-
-    def forward(self, x: torch.Tensor):
-        B, T, C, L, H = x.shape
-        assert C == self.input_channels
-        x = x[:,0,:,:,:]
-        output = self.base_model(x) 
-        return output.view(B, self.nb_classes, L, H)
 
 
 def split_dataset(dataset:BaselineDataset, num_folds: int = 5):
@@ -141,10 +93,13 @@ def train_crossval_loop(
                 optimizer.zero_grad()
 
                 # Forward pass
-                outputs = model(inputs["S2"][:, :, :, :, :])  # only use the 10th image
-
+                outputs = model(inputs["S2"]) 
+                # outputs shape B 20 T H W 
+                # we want B 20 H W 
+                outputs_median_time = torch.median(outputs,2).values
+                
                 # Loss computation
-                loss = criterion(outputs, targets)
+                loss = criterion(outputs_median_time, targets)
 
                 # Backward pass and optimization
                 loss.backward()
@@ -152,7 +107,7 @@ def train_crossval_loop(
                 running_loss += loss.item()
 
                 # Get the predicted class per pixel (B, H, W)
-                preds = torch.argmax(outputs, dim=1)
+                preds = torch.argmax(outputs_median_time, dim=1)
 
                 # Move data from GPU/Metal to CPU
                 targets = targets.cpu().numpy().flatten()
@@ -176,7 +131,8 @@ def train_crossval_loop(
             inputs["S2"] = inputs["S2"].to(device)  # Satellite data
             targets_batch= targets_batch.to(device)
             outputs_batch = model(inputs["S2"])
-            outputs.append(outputs_batch)
+            outputs_batch_median_time  = torch.median(outputs_batch,2).values
+            outputs.append(outputs_batch_median_time)
             targets.append(targets_batch)
         outputs_tensor = torch.concat(outputs) # (B, 20, H, W )
         targets = torch.concat(targets)
@@ -219,7 +175,6 @@ def train_crossval_loop(
 # grouped split 
 folds = 5 
 batch_size = 10 
-import torch 
 dataset.meta_patch
 
 # lets try the cross val function above
@@ -236,3 +191,8 @@ model, results_folds, mean_iou_cv = train_crossval_loop(
 )
 
 # %% 
+
+# model = UNet(in_channels = 10, out_channels = 20, dim = 3)
+# sample_input = torch.randn(13,41,10, 128,128)
+# output = model(sample_input)
+# outputs_median_time = torch.median(output,2).values
