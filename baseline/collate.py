@@ -4,25 +4,28 @@ import re
 import torch
 from torch.nn import functional as F
 
-
 def pad_tensor(x, l, pad_value=0):
     padlen = l - x.shape[0]
     pad = [0 for _ in range(2 * len(x.shape[1:]))] + [0, padlen]
     return F.pad(x, pad=pad, value=pad_value)
 
-
 np_str_obj_array_pattern = re.compile(r"[SaUO]")
 
-
 def pad_collate(batch, pad_value=0):
-    # Utility function to be used as collate_fn for the PyTorch dataloader
-    # to handle sequences of varying length.
-    # Sequences are padded with zeros by default.
-    #
-    # Modified default_collate from the official pytorch repo
-    # https://github.com/pytorch/pytorch/blob/master/torch/utils/data/_utils/collate.py
+    """
+    Custom collate function to handle 'dates' separately from tensor data.
+
+    Args:
+        batch: List of tuples where each tuple is (data_dict, target).
+
+    Returns:
+        A tuple containing:
+            - data: Dictionary with batched tensors and a list of dates.
+            - targets: Batched target tensors.
+    """
     elem = batch[0]
     elem_type = type(elem)
+    
     if isinstance(elem, torch.Tensor):
         out = None
         if len(elem.shape) > 0:
@@ -38,33 +41,43 @@ def pad_collate(batch, pad_value=0):
             storage = elem.storage()._new_shared(numel)
             out = elem.new(storage)
         return torch.stack(batch, 0, out=out)
+    
     elif (
         elem_type.__module__ == "numpy"
-        and elem_type.__name__ != "str_"
-        and elem_type.__name__ != "string_"
+        and elem_type.__name__ not in ["str_", "string_"]
     ):
-        if elem_type.__name__ == "ndarray" or elem_type.__name__ == "memmap":
+        if elem_type.__name__ in ["ndarray", "memmap"]:
             # array of string classes and object
             if np_str_obj_array_pattern.search(elem.dtype.str) is not None:
                 raise TypeError("Format not managed : {}".format(elem.dtype))
-
             return pad_collate([torch.as_tensor(b) for b in batch])
         elif elem.shape == ():  # scalars
             return torch.as_tensor(batch)
-
+    
     elif isinstance(elem, collections.abc.Mapping):
-        return {key: pad_collate([d[key] for d in batch]) for key in elem}
-
+        collated = {}
+        for key in elem:
+            if key == 'dates':
+                # Collect 'dates' as a list of lists without recursion
+                collated[key] = [d[key] for d in batch]
+            else:
+                # Recursively pad other keys
+                collated[key] = pad_collate([d[key] for d in batch])
+        return collated
+    
     elif isinstance(elem, tuple) and hasattr(elem, "_fields"):  # namedtuple
         return elem_type(*(pad_collate(samples) for samples in zip(*batch)))
-
-    elif isinstance(elem, collections.abc.Sequence):
-        # check to make sure that the elements in batch have consistent size
+    
+    elif isinstance(elem, collections.abc.Sequence) and not isinstance(elem, (str, bytes)):
+        # Check to make sure that the elements in batch have consistent size
         it = iter(batch)
-        elem_size = len(next(it))
-        if not all(len(elem) == elem_size for elem in it):
-            raise RuntimeError("each element in list of batch should be of equal size")
+        try:
+            elem_size = len(next(it))
+        except StopIteration:
+            elem_size = 0
+        if not all(len(e) == elem_size for e in it):
+            raise RuntimeError("Each element in the batch should be of equal size.")
         transposed = zip(*batch)
         return [pad_collate(samples) for samples in transposed]
-
+    
     raise TypeError("Format not managed : {}".format(elem_type))
