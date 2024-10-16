@@ -9,16 +9,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 
-from baseline.train import train_model
 from collections import defaultdict 
 
-#from baseline.model import SimpleSegmentationModel
 from baseline.linear_model import LinearModel1
 from pathlib import Path
 from sklearn.metrics import jaccard_score
 from baseline.collate import pad_collate
 from baseline.dataset import BaselineDataset
-from baseline.model import SimpleSegmentationModel
 from utils.dummy_model import SimpleSegmentationModelWrapper
 #from unet3d.unet3d import UNet
 
@@ -49,7 +46,7 @@ def train_crossval_loop(
     nb_classes: int,
     input_channels: int,
     data_folder: str, 
-    max_samples : int = 100,
+    max_samples : int = 10,
     num_folds : int = 5,
     num_epochs: int = 10,
     batch_size: int = 4,
@@ -71,8 +68,12 @@ def train_crossval_loop(
     results_folds = defaultdict(list)
     oof_preds = []
     validation_targets = []
-    for i, (ds_train, ds_val) in enumerate(split_dataset(dataset,num_folds)):
-        model = model_class(input_channels, nb_classes, dim = 3)
+    for i, (ds_train, ds_val) in enumerate(split_dataset(dataset, num_folds)):
+        # Instantiate the model with additional keyword arguments
+        model = model_class(10,128,128,25)
+        model.to(device)
+    #for i, (ds_train, ds_val) in enumerate(split_dataset(dataset,num_folds)):
+    #    model = model_class(input_channels, nb_classes, dim = 3)
         dataloader_train = torch.utils.data.DataLoader(
             ds_train, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
         )
@@ -189,7 +190,8 @@ if __name__ == "__main__" :
         nb_classes=20,
         input_channels= 10,
         batch_size=1,
-        num_epochs= 1
+        num_epochs= 1,
+        data_folder="/Users/ludoviclepic/Desktop/Capgemini/hackathon-mines-invent-2024-team-butterfly/TRAIN"
     )
 
 
