@@ -398,7 +398,7 @@ class UNet(nn.Module):
         self,
         in_channels: int = 1,
         out_channels: int = 2,
-        n_blocks: int = 4,
+        n_blocks: int = 3,
         start_filters: int = 32,
         activation: str = ActivationFunction.RELU,
         normalization: str = NormalizationLayer.BATCH,
