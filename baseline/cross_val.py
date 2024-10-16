@@ -123,21 +123,22 @@ def train_crossval_loop(
         # N, L, H where N is the size of the validation fold 
         model.eval()
         dataloader_val = torch.utils.data.DataLoader(
-            ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
+            ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
         )
         outputs= []
         # (N , C , L , H)
         print(f"finished training, evaluation over oof")
-        targets = []
-        for i, (inputs, targets_batch) in tqdm(enumerate(dataloader_val), total=len(dataloader_val)):
-            inputs["S2"] = inputs["S2"].to(device)  # Satellite data
-            targets_batch= targets_batch.to(device)
-            outputs_batch = model(inputs["S2"])
-            outputs_batch_median_time  = torch.median(outputs_batch,2).values
-            outputs.append(outputs_batch_median_time)
-            targets.append(targets_batch)
-        outputs_tensor = torch.concat(outputs) # (B, 20, H, W )
-        targets = torch.concat(targets)
+        with torch.no_grad():
+            targets = []
+            for i, (inputs, targets_batch) in tqdm(enumerate(dataloader_val), total=len(dataloader_val)):
+                inputs["S2"] = inputs["S2"].to(device)  # Satellite data
+                targets_batch= targets_batch.to(device)
+                outputs_batch = model(inputs["S2"])
+                outputs_batch_median_time  = torch.median(outputs_batch,2).values
+                outputs.append(outputs_batch_median_time.cpu())
+                targets.append(targets_batch.cpu())
+            outputs_tensor = torch.concat(outputs) # (B, 20, H, W )
+            targets = torch.concat(targets)
 
 
         # Get the predicted class per pixel (B, H, W)
