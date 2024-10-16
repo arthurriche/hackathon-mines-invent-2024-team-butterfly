@@ -12,7 +12,6 @@ import torch.optim as optim
 from baseline.train import train_model
 from collections import defaultdict 
 from baseline.collate import pad_collate
-from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
 from pathlib import Path
 from sklearn.metrics import jaccard_score
@@ -49,6 +48,7 @@ def train_crossval_loop(
     nb_classes: int,
     input_channels: int,
     data_folder: str, 
+    max_samples : int = 100,
     num_folds : int = 5,
     num_epochs: int = 10,
     batch_size: int = 4,
@@ -65,7 +65,7 @@ def train_crossval_loop(
         data_folder
     )
     assert data_folder.exists()
-    dataset = BaselineDataset(data_folder)
+    dataset = BaselineDataset(data_folder, max_samples=max_samples)
     criterion = nn.CrossEntropyLoss()
     results_folds = defaultdict(list)
     oof_preds = []
