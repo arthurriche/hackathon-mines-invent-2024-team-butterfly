@@ -11,15 +11,16 @@ import torch.optim as optim
 
 from baseline.train import train_model
 from collections import defaultdict 
-from baseline.collate import pad_collate
-from baseline.model import SimpleSegmentationModel
+
+#from baseline.model import SimpleSegmentationModel
+from baseline.linear_model import LinearModel1
 from pathlib import Path
 from sklearn.metrics import jaccard_score
 from baseline.collate import pad_collate
 from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
 from utils.dummy_model import SimpleSegmentationModelWrapper
-from unet3d.unet3d import UNet
+#from unet3d.unet3d import UNet
 
 
 
@@ -184,10 +185,12 @@ if __name__ == "__main__" :
     nb_classes = 20
 
     model, results_folds, mean_iou_cv = train_crossval_loop(
-        model_class = SimpleSegmentationModelWrapper,
+        model_class = LinearModel1,
         nb_classes=20,
         input_channels= 10,
         batch_size=1,
         num_epochs= 1
     )
 
+
+# %%
