@@ -538,7 +538,7 @@ class UnetWrapper(nn.Module):
         activation: str = ActivationFunction.RELU,
         normalization: str = NormalizationLayer.BATCH,
         conv_mode: str = ConvMode.SAME,
-        dim: int = Dimensions.TWO,
+        dim: int = Dimensions.THREE,
         up_mode: str = UpMode.TRANSPOSED):
         super().__init__()
         self.unet = UNet(

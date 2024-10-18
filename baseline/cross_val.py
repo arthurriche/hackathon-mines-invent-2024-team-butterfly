@@ -62,7 +62,6 @@ def eval_loop(model:nn.Module, dataloader_val:  torch.utils.data.DataLoader, dev
 def train_crossval_loop(
     model_class : torch.nn.modules.module.Module,
     data_folder: str, 
-    max_samples : int = 100,
     num_folds : int = 5,
     num_epochs: int = 10,
     batch_size: int = 4,
@@ -70,6 +69,7 @@ def train_crossval_loop(
     device: str = "cpu",
     verbose: bool = False,
     get_validation_loss_during_training : bool = True,
+    max_samples : int = None,
     **model_kwargs  
 ):
     """
@@ -110,14 +110,14 @@ def train_crossval_loop(
 
             for batch_nbr, (inputs, targets) in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
                 # Move data to device
-                inputs["S2"] = inputs["S2"].to(device)  # Satellite data
+                inputs_batch = inputs["S2"].to(device)  # Satellite data
                 targets = targets.to(device)
 
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
                 # outputs should be of shape (B, 20, H ,W)
-                outputs = model(inputs["S2"]) 
+                outputs = model(inputs_batch) 
 
                 loss = criterion(outputs, targets)
 
@@ -125,10 +125,6 @@ def train_crossval_loop(
                 loss.backward()
                 optimizer.step()
                 running_loss += loss.item()
-
-                # Get the predicted class per pixel (B, H, W)
-                preds = torch.argmax(outputs, dim=1)
-
 
             # Print the loss for this epoch
             epoch_loss = running_loss / len(dataloader_train)
@@ -138,7 +134,8 @@ def train_crossval_loop(
             results_per_epoch["epoch"].append(epoch)
 
             # get the score for this epoch
-            if get_validation_loss_during_training : 
+            if get_validation_loss_during_training :
+                print(f"...running inference for validation loss and iou...")
                 dataloader_val = torch.utils.data.DataLoader(
                     ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
                 )
