@@ -44,6 +44,53 @@ class OutputDataset(torch.utils.data.Dataset):
 
         return data
 
+class OutputNoCloudDataset(torch.utils.data.Dataset):
+    def __init__(self, folder: Path):
+        super(OutputNoCloudDataset, self).__init__()
+        self.folder = folder
+
+        # Get metadata
+        print("Reading patch metadata ...")
+        self.meta_patch = gpd.read_file(os.path.join(folder, "metadata.geojson"))
+        self.meta_patch.index = self.meta_patch["ID"].astype(int)
+        self.meta_patch.sort_index(inplace=True)
+        print("Done.")
+
+        self.len = self.meta_patch.shape[0]
+        self.id_patches = self.meta_patch.index
+        print("Dataset ready.")
+
+    def __len__(self) -> int:
+        return self.len
+
+    @staticmethod
+    def remove_clouds(sample,n_channels=10,q_diff=.8,cloud_perc=.5):
+
+        median = torch.median(sample,axis=0).values
+
+        diff = torch.sqrt((sample-median.view(1,sample.size(1),sample.size(2),sample.size(3))) ** 2)
+
+        quantile = torch.quantile(diff
+                                .transpose(1,0)
+                                .reshape(n_channels,-1),q_diff,dim=-1)
+
+        mask = diff>quantile.view(1,n_channels,1,1)
+        is_not_cloudy = ~(torch.max(torch.sum(torch.sum(mask,dim=-1),dim=-1) / (sample.size(-1) ** 2) > cloud_perc,dim=-1).values)
+        
+        return sample[is_not_cloudy,...]
+    
+    def __getitem__(self, item: int) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+        id_patch = self.id_patches[item]
+
+        # Open and prepare satellite data into T x C x H x W arrays
+        path_patch = os.path.join(self.folder, "DATA_S2", "S2_{}.npy".format(id_patch))
+        data = np.load(path_patch).astype(np.float32)
+        data = {"S2": self.remove_clouds(torch.from_numpy(data))}
+        #Get the id for output submission
+        data['ID'] = id_patch
+
+        return data
+
 def masks_to_str(predictions: np.ndarray) -> list[str]:
     """
     Convert the
@@ -67,7 +114,7 @@ def eval_model(
     Training pipeline.
     """
     # Create data loader
-    dataset = OutputDataset(data_folder)
+    dataset = OutputNoCloudDataset(data_folder)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
     )

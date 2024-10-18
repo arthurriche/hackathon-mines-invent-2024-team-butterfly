@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 from unet3d.collate import pad_collate
-from unet3d.dataset import BaselineDataset
+from unet3d.dataset import BaselineDataset, NoCloudDataset
 from unet3d.unet3d import UNet
 
 
@@ -73,7 +73,7 @@ def train_model(
     Training pipeline.
     """
     # Create data loader
-    dataset = BaselineDataset(data_folder)
+    dataset = NoCloudDataset(data_folder)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
     )
