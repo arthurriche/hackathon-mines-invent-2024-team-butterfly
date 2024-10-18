@@ -2,7 +2,7 @@ from enum import Enum, IntEnum
 from typing import Optional, Union
 
 import torch
-from torch import nn
+import torch.nn as nn 
 
 
 class ActivationFunction(str, Enum):
@@ -521,3 +521,41 @@ class UNet(nn.Module):
         }
         d = {self.__class__.__name__: attributes}
         return f"{d}"
+
+
+
+class UnetWrapper(nn.Module):
+    """
+    Wrapper around the UNet Module to take the median of the outputs
+     w.r.t the time dimension
+    Takes as input (B,C,T,H,W) and the kernel dim is 3 (over the T,H,W dims)
+    """
+    def __init__(self, 
+        in_channels: int = 1,
+        out_channels: int = 2,
+        n_blocks: int = 3,
+        start_filters: int = 32,
+        activation: str = ActivationFunction.RELU,
+        normalization: str = NormalizationLayer.BATCH,
+        conv_mode: str = ConvMode.SAME,
+        dim: int = Dimensions.TWO,
+        up_mode: str = UpMode.TRANSPOSED):
+        super().__init__()
+        self.unet = UNet(
+            in_channels=in_channels,
+            out_channels=out_channels,
+            n_blocks=n_blocks,
+            start_filters=start_filters,
+            activation=activation,
+            normalization=normalization,
+            conv_mode=conv_mode,
+            dim=dim,
+            up_mode=up_mode
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        # x is of shape (B, T, C, H, W)
+        output = self.unet(x)
+        # output shape (B, T, 20, H, W)
+        outputs_median_time = torch.median(output, dim=1)
+        return outputs_median_time[0]  # Return the median values, not the indices

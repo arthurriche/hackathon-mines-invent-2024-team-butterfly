@@ -13,6 +13,7 @@ from baseline.train import train_model
 from collections import defaultdict 
 from baseline.collate import pad_collate
 from baseline.model import SimpleSegmentationModel
+from datetime import datetime
 from pathlib import Path
 from sklearn.metrics import jaccard_score
 from baseline.collate import pad_collate
@@ -20,10 +21,8 @@ from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
 from utils.dummy_model import SimpleSegmentationModelWrapper
 from unet3d.unet3d import UNet
+from utils.model_io import save_full_model
 
-
-
-# %% 
 """
 Model takes 
 X shape (B,T,C,L,H)
@@ -43,10 +42,25 @@ def split_dataset(dataset:BaselineDataset, num_folds: int = 5):
         ds_val =  torch.utils.data.Subset(dataset,indices_val)
         yield ds_train, ds_val
 
+
+def eval_loop(model:nn.Module, dataloader_val:  torch.utils.data.DataLoader, device : str = "cuda"):
+    model.eval()
+    outputs= []
+    targets = []
+    # (N , C , L , H)
+    with torch.no_grad():
+        for i, (inputs, targets_batch) in tqdm(enumerate(dataloader_val), total=len(dataloader_val)):
+            inputs["S2"] = inputs["S2"].to(device)  # Satellite data
+            targets_batch= targets_batch.to(device)
+            outputs_batch = model(inputs["S2"])
+            outputs.append(outputs_batch.cpu())
+            targets.append(targets_batch.cpu())
+        outputs_tensor = torch.concat(outputs).cpu() # (B, 20, H, W )
+        targets = torch.concat(targets).cpu()
+    return outputs_tensor, targets 
+
 def train_crossval_loop(
     model_class : torch.nn.modules.module.Module,
-    nb_classes: int,
-    input_channels: int,
     data_folder: str, 
     max_samples : int = 100,
     num_folds : int = 5,
@@ -55,6 +69,8 @@ def train_crossval_loop(
     learning_rate: float = 1e-3,
     device: str = "cpu",
     verbose: bool = False,
+    get_validation_loss_during_training : bool = True,
+    **model_kwargs  
 ):
     """
     Training Loop. No cross validation. Must provide the datasets for training and validation
@@ -67,11 +83,16 @@ def train_crossval_loop(
     assert data_folder.exists()
     dataset = BaselineDataset(data_folder, max_samples=max_samples)
     criterion = nn.CrossEntropyLoss()
-    results_folds = defaultdict(list)
     oof_preds = []
     validation_targets = []
-    for i, (ds_train, ds_val) in enumerate(split_dataset(dataset,num_folds)):
-        model = model_class(input_channels, nb_classes, dim = 3)
+    results_training = {
+        "oof_preds" : oof_preds,
+        "validation_targets" : validation_targets,
+        "training_metrics" : {}
+    }
+
+    for fold_nbr, (ds_train, ds_val) in enumerate(split_dataset(dataset,num_folds)):
+        model = model_class(**model_kwargs)
         dataloader_train = torch.utils.data.DataLoader(
             ds_train, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
         )
@@ -80,13 +101,14 @@ def train_crossval_loop(
         # Move the model to the appropriate device (GPU if available)
         device = torch.device(device)
         model.to(device)
-
+        results_per_epoch = defaultdict(list)
+        fold_preds = None # predictions, the ones for which the val iou was smallest 
         # Training loop
         for epoch in range(num_epochs):
             model.train()  # Set the model to training mode
             running_loss = 0.0
 
-            for i, (inputs, targets) in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
+            for batch_nbr, (inputs, targets) in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
                 # Move data to device
                 inputs["S2"] = inputs["S2"].to(device)  # Satellite data
                 targets = targets.to(device)
@@ -94,14 +116,10 @@ def train_crossval_loop(
                 # Zero the parameter gradients
                 optimizer.zero_grad()
 
-                # Forward pass
+                # outputs should be of shape (B, 20, H ,W)
                 outputs = model(inputs["S2"]) 
-                # outputs shape B 20 T H W 
-                # we want B 20 H W 
-                outputs_median_time = torch.median(outputs,2).values
-                
-                # Loss computation
-                loss = criterion(outputs_median_time, targets)
+
+                loss = criterion(outputs, targets)
 
                 # Backward pass and optimization
                 loss.backward()
@@ -109,59 +127,38 @@ def train_crossval_loop(
                 running_loss += loss.item()
 
                 # Get the predicted class per pixel (B, H, W)
-                preds = torch.argmax(outputs_median_time, dim=1)
+                preds = torch.argmax(outputs, dim=1)
 
-                # Move data from GPU/Metal to CPU
-                targets = targets.cpu().numpy().flatten()
-                preds = preds.cpu().numpy().flatten()
 
             # Print the loss for this epoch
             epoch_loss = running_loss / len(dataloader_train)
             print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}")
 
+            results_per_epoch["loss"].append(epoch_loss)
+            results_per_epoch["epoch"].append(epoch)
+
+            # get the score for this epoch
+            if get_validation_loss_during_training : 
+                dataloader_val = torch.utils.data.DataLoader(
+                    ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
+                )
+                outputs_tensor, targets = eval_loop(model, dataloader_val,device )
+                preds = torch.argmax(outputs_tensor, dim=1)
+                targets_flat_npy = targets.numpy().flatten()
+                preds_flat_npy = preds.numpy().flatten()
+                mean_iou_val_epoch= jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
+                print(f"Fold {fold_nbr}, Epoch {epoch} : Val IOU {mean_iou_val_epoch:.3f}, Val Loss {epoch_loss:.3f} ")
+                results_per_epoch["iou"].append(mean_iou_val_epoch)
+                if mean_iou_val_epoch  ==  max(results_per_epoch["iou"]):
+                    fold_preds = preds
+                """
+                If the score for this epoch is better than the last, then keep the preds for this epoch
+                """
         # get validation loss 
-        # N, L, H where N is the size of the validation fold 
-        model.eval()
-        dataloader_val = torch.utils.data.DataLoader(
-            ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
-        )
-        outputs= []
-        # (N , C , L , H)
-        print(f"finished training, evaluation over oof")
-        with torch.no_grad():
-            targets = []
-            for i, (inputs, targets_batch) in tqdm(enumerate(dataloader_val), total=len(dataloader_val)):
-                inputs["S2"] = inputs["S2"].to(device)  # Satellite data
-                targets_batch= targets_batch.to(device)
-                outputs_batch = model(inputs["S2"])
-                outputs_batch_median_time  = torch.median(outputs_batch,2).values
-                outputs.append(outputs_batch_median_time.cpu())
-                targets.append(targets_batch.cpu())
-            outputs_tensor = torch.concat(outputs) # (B, 20, H, W )
-            targets = torch.concat(targets)
-
-
-        # Get the predicted class per pixel (B, H, W)
-        preds = torch.argmax(outputs_tensor, dim=1)
-        oof_preds.append(preds) # shape (N_fold, H, W), type int 
-        validation_targets.append(targets)  # shape (N_fold, H, W), type int  
-
-        # Move data from GPU/Metal to CPU
-        targets_flat_npy = targets.cpu().numpy().flatten()
-        preds_flat_npy = preds.cpu().numpy().flatten()
-
-        # cv eval loss 
-        loss_val = criterion(outputs_tensor, targets)
-
-        # cv eval mean iou 
-        mean_iou_val = jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
-
-        print(f"cv loss {loss_val:.4f} - cv mean_iou {mean_iou_val:.4f}")
-
-        results_folds["fold"].append(i)
-        results_folds["loss_val"].append(loss_val)
-        results_folds["mean_iou_val"].append(mean_iou_val)
-    
+        # N, H, W where N is the size of the validation fold 
+        results_training["oof_preds"].append(fold_preds) # shape (N_fold, H, W), type int 
+        results_training["validation_targets"].append(targets)  # shape (N_fold, H, W), type int  
+        results_training["training_metrics"][f"fold_{fold_nbr}"] = results_per_epoch
     oof_preds_tensor = torch.concat(oof_preds)
     validation_targets_tensor = torch.concat(validation_targets)
 
@@ -170,25 +167,28 @@ def train_crossval_loop(
 
     mean_iou_cv = jaccard_score(oof_preds_flat_npy, validation_targets_flat_npy, average="macro")
 
-    print("Training complete.")
-    return model, results_folds, mean_iou_cv
+    print(f"IOU full CV : {mean_iou_cv}")
+
+    return model, results_training, mean_iou_cv
 # %%
 if __name__ == "__main__" : 
     # how to split accurately
     # grouped split 
     folds = 5 
     batch_size = 10 
-
-    # lets try the cross val function above
-
     input_channels = 10 
     nb_classes = 20
+    model_class = SimpleSegmentationModelWrapper
 
-    model, results_folds, mean_iou_cv = train_crossval_loop(
-        model_class = SimpleSegmentationModelWrapper,
-        nb_classes=20,
-        input_channels= 10,
+    model, results_training, mean_iou_cv = train_crossval_loop(
+        model_class =model_class,
+        data_folder="DATA-mini",
         batch_size=1,
-        num_epochs= 1
+        num_epochs= 3,
+        # model kwargs 
+        in_channels = 10,
+        out_channels = 20,
     )
 
+    save_full_model(model, f"outputs/{model_class.__name__}_{datetime.now().strftime(f'%m-%d_%H-%M')}")
+    # %%

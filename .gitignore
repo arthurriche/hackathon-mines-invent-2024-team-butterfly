@@ -145,3 +145,6 @@ DATA-MINI/
 
 # dataset creation notebook
 create_datasets.ipynb
+
+# outputted models 
+outputs/
