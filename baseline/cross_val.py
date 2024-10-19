@@ -147,7 +147,7 @@ def train_crossval_loop(
                 dataloader_val = torch.utils.data.DataLoader(
                     ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
                 )
-                outputs_tensor, targets = eval_loop(model, dataloader_val,device )
+                outputs_tensor, targets = eval_loop(model, dataloader_val,device, debug =debug )
                 preds = torch.argmax(outputs_tensor, dim=1)
                 targets_flat_npy = targets.numpy().flatten()
                 preds_flat_npy = preds.numpy().flatten()
