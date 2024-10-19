@@ -43,7 +43,11 @@ def split_dataset(dataset:BaselineDataset, num_folds: int = 5):
         yield ds_train, ds_val
 
 
-def eval_loop(model:nn.Module, dataloader_val:  torch.utils.data.DataLoader, device : str = "cuda"):
+def eval_loop(
+        model:nn.Module,
+        dataloader_val:  torch.utils.data.DataLoader,
+        device : str = "cuda",
+        debug : bool = False):
     model.eval()
     outputs= []
     targets = []
@@ -53,8 +57,11 @@ def eval_loop(model:nn.Module, dataloader_val:  torch.utils.data.DataLoader, dev
             inputs["S2"] = inputs["S2"].to(device)  # Satellite data
             targets_batch= targets_batch.to(device)
             outputs_batch = model(inputs["S2"])
+            # outputs should be of shape B 20 H W 
             outputs.append(outputs_batch.cpu())
             targets.append(targets_batch.cpu())
+        if debug : 
+            print(f"len outputs {outputs.__len__()}", f"{outputs[0].shape=}")
         outputs_tensor = torch.concat(outputs).cpu() # (B, 20, H, W )
         targets = torch.concat(targets).cpu()
     return outputs_tensor, targets 
@@ -70,6 +77,7 @@ def train_crossval_loop(
     verbose: bool = False,
     get_validation_loss_during_training : bool = True,
     max_samples : int = None,
+    debug : bool = False,
     **model_kwargs  
 ):
     """
@@ -169,23 +177,44 @@ def train_crossval_loop(
     return model, results_training, mean_iou_cv
 # %%
 if __name__ == "__main__" : 
-    # how to split accurately
-    # grouped split 
+    # # how to split accurately
+    # # grouped split 
+    # folds = 5 
+    # batch_size = 10 
+    # input_channels = 10 
+    # nb_classes = 20
+    # model_class = SimpleSegmentationModelWrapper
+
+    # model, results_training, mean_iou_cv = train_crossval_loop(
+    #     model_class =model_class,
+    #     data_folder="DATA-mini",
+    #     batch_size=1,
+    #     num_epochs= 3,
+    #     # model kwargs 
+    #     in_channels = 10,
+    #     out_channels = 20,
+    # )
+
+    # save_full_model(model, f"outputs/{model_class.__name__}_{datetime.now().strftime(f'%m-%d_%H-%M')}")
     folds = 5 
     batch_size = 10 
     input_channels = 10 
     nb_classes = 20
     model_class = SimpleSegmentationModelWrapper
-
+    data_folder = Path("DATA-mini")
+    assert data_folder.exists()
     model, results_training, mean_iou_cv = train_crossval_loop(
-        model_class =model_class,
-        data_folder="DATA-mini",
-        batch_size=1,
-        num_epochs= 3,
-        # model kwargs 
+        model_class = model_class,
+        data_folder=data_folder,
+        batch_size=4,
+        num_epochs= 2,
+        num_folds = 2,
+        device= "cpu", 
+        max_samples = 40,
+        # model kwargs below: 
         in_channels = 10,
         out_channels = 20,
+        # dim = 3
     )
 
-    save_full_model(model, f"outputs/{model_class.__name__}_{datetime.now().strftime(f'%m-%d_%H-%M')}")
-    # %%
+# %%
