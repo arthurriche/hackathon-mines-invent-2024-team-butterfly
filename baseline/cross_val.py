@@ -129,7 +129,7 @@ def train_crossval_loop(
                 # outputs should be of shape (B, 20, H ,W)
                 if debug : 
                     print(inputs_batch.shape )
-                outputs = model(inputs_batch, debug = debug) 
+                outputs = model(inputs_batch.transpose(1,2), debug = debug) 
 
                 loss = criterion(outputs, targets)
 
