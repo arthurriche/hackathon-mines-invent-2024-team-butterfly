@@ -56,7 +56,7 @@ def eval_loop(
         for i, (inputs, targets_batch) in tqdm(enumerate(dataloader_val), total=len(dataloader_val)):
             inputs["S2"] = inputs["S2"].to(device)  # Satellite data
             targets_batch= targets_batch.to(device)
-            outputs_batch = model(inputs["S2"])
+            outputs_batch = model(inputs["S2"], debug = debug)
             # outputs should be of shape B 20 H W 
             outputs.append(outputs_batch.cpu())
             targets.append(targets_batch.cpu())
@@ -127,7 +127,7 @@ def train_crossval_loop(
                 optimizer.zero_grad()
 
                 # outputs should be of shape (B, 20, H ,W)
-                outputs = model(inputs_batch) 
+                outputs = model(inputs_batch, debug = debug) 
 
                 loss = criterion(outputs, targets)
 
