@@ -127,6 +127,8 @@ def train_crossval_loop(
                 optimizer.zero_grad()
 
                 # outputs should be of shape (B, 20, H ,W)
+                if debug : 
+                    print(inputs_batch.shape )
                 outputs = model(inputs_batch, debug = debug) 
 
                 loss = criterion(outputs, targets)
