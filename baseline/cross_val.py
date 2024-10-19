@@ -61,6 +61,7 @@ def eval_loop(
             outputs.append(outputs_batch.cpu())
             targets.append(targets_batch.cpu())
             if debug: 
+                print(f"{inputs.shape=}")
                 print(f"outputs batch shape {outputs_batch.shape}")
         if debug : 
             print(f"len outputs {outputs.__len__()}", f"{outputs[0].shape=}")
@@ -76,7 +77,6 @@ def train_crossval_loop(
     batch_size: int = 4,
     learning_rate: float = 1e-3,
     device: str = "cpu",
-    verbose: bool = False,
     get_validation_loss_during_training : bool = True,
     max_samples : int = None,
     debug : bool = False,
