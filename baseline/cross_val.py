@@ -61,7 +61,7 @@ def eval_loop(
             outputs.append(outputs_batch.cpu())
             targets.append(targets_batch.cpu())
             if debug: 
-                print(f"{inputs["S2"].shape=}")
+                print(f"{inputs['S2'].shape=}")
                 print(f"outputs batch shape {outputs_batch.shape}")
         if debug : 
             print(f"len outputs {outputs.__len__()}", f"{outputs[0].shape=}")
