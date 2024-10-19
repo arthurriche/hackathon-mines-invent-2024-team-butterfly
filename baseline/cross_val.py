@@ -60,6 +60,8 @@ def eval_loop(
             # outputs should be of shape B 20 H W 
             outputs.append(outputs_batch.cpu())
             targets.append(targets_batch.cpu())
+            if debug: 
+                print(f"outputs batch shape {outputs_batch.shape}")
         if debug : 
             print(f"len outputs {outputs.__len__()}", f"{outputs[0].shape=}")
         outputs_tensor = torch.concat(outputs).cpu() # (B, 20, H, W )
