@@ -81,6 +81,7 @@ def train_crossval_loop(
     dataset_class = BaselineDataset,
     max_samples : int = None,
     debug : bool = False,
+    weights_criterion : torch.tensor|None= None,
     **model_kwargs  
 ):
     """
@@ -93,7 +94,10 @@ def train_crossval_loop(
     )
     assert data_folder.exists()
     dataset = dataset_class(data_folder, max_samples=max_samples)
-    criterion = nn.CrossEntropyLoss()
+    if weights_criterion:
+        criterion = nn.CrossEntropyLoss(weight=weights_criterion)
+    else:
+        criterion = nn.CrossEntropyLoss()
     oof_preds = []
     validation_targets = []
     results_training = {
