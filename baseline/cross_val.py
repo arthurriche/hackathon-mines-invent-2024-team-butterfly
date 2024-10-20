@@ -8,6 +8,7 @@ from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import pickle
 
 from baseline.train import train_model
 from collections import defaultdict 
@@ -22,7 +23,6 @@ from baseline.model import SimpleSegmentationModel
 from utils.dummy_model import SimpleSegmentationModelWrapper
 from unet3d.unet3d import UNet
 from utils.model_io import save_full_model
-
 """
 Model takes 
 X shape (B,T,C,L,H)
@@ -148,29 +148,31 @@ def train_crossval_loop(
             results_per_epoch["epoch"].append(epoch)
 
             # get the score for this epoch
-            if get_validation_loss_during_training :
-                if epoch % 5 ==0 or epoch == num_epochs - 1: 
-                    print(f"...running inference for validation loss and iou...")
-                    dataloader_val = torch.utils.data.DataLoader(
-                        ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
-                    )
-                    outputs_tensor, targets = eval_loop(model, dataloader_val,device, debug =debug )
-                    preds = torch.argmax(outputs_tensor, dim=1)
-                    targets_flat_npy = targets.numpy().flatten()
-                    preds_flat_npy = preds.numpy().flatten()
-                    mean_iou_val_epoch= jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
-                    print(f"Fold {fold_nbr}, Epoch {epoch} : Val IOU {mean_iou_val_epoch:.3f}, Val Loss {epoch_loss:.3f} ")
-                    results_per_epoch["iou"].append(mean_iou_val_epoch)
-                    if mean_iou_val_epoch  ==  max(results_per_epoch["iou"]):
-                        fold_preds = preds
-                    """
-                    If the score for this epoch is better than the last, then keep the preds for this epoch
-                    """
+            if get_validation_loss_during_training and fold_nbr == 1 and epoch % 2 == 0: 
+                print(f"...running inference for validation loss and iou...")
+                dataloader_val = torch.utils.data.DataLoader(
+                    ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
+                )
+                outputs_tensor, targets = eval_loop(model, dataloader_val,device, debug =debug )
+                preds = torch.argmax(outputs_tensor, dim=1)
+                targets_flat_npy = targets.numpy().flatten()
+                preds_flat_npy = preds.numpy().flatten()
+                mean_iou_val_epoch= jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
+                print(f"Fold {fold_nbr}, Epoch {epoch} : Val IOU {mean_iou_val_epoch:.3f}, Val Loss {epoch_loss:.3f} ")
+                results_per_epoch["iou"].append(mean_iou_val_epoch)
+                if mean_iou_val_epoch  ==  max(results_per_epoch["iou"]):
+                    fold_preds = preds
+                """
+                If the score for this epoch is better than the last, then keep the preds for this epoch
+                """
         # get validation loss 
         # N, H, W where N is the size of the validation fold 
         results_training["oof_preds"].append(fold_preds) # shape (N_fold, H, W), type int 
         results_training["validation_targets"].append(targets)  # shape (N_fold, H, W), type int  
         results_training["training_metrics"][f"fold_{fold_nbr}"] = results_per_epoch
+        file_path_results_training = f"/kaggle/working/training_metrics_{model_class.__name__}_{datetime.now().strftime('%m-%d_%H-%M')}_fold{fold_nbr}.pkl"
+        with open(file_path_results_training, 'wb') as f:
+            pickle.dump(results_training, f)
     oof_preds_tensor = torch.concat(oof_preds)
     validation_targets_tensor = torch.concat(validation_targets)
 
