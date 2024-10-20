@@ -94,7 +94,7 @@ def train_crossval_loop(
     )
     assert data_folder.exists()
     dataset = dataset_class(data_folder, max_samples=max_samples)
-    if weights_criterion:
+    if weights_criterion is not None:
         criterion = nn.CrossEntropyLoss(weight=weights_criterion)
     else:
         criterion = nn.CrossEntropyLoss()
