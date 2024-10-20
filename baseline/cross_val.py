@@ -143,7 +143,7 @@ def train_crossval_loop(
 
             # Print the loss for this epoch
             epoch_loss = running_loss / len(dataloader_train)
-            print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {epoch_loss:.4f}")
+            print(f"epoch {epoch} - loss: {epoch_loss:.4f}")
 
             results_per_epoch["loss"].append(epoch_loss)
             results_per_epoch["epoch"].append(epoch)
@@ -173,6 +173,7 @@ def train_crossval_loop(
         results_training["validation_targets"].append(targets)  # shape (N_fold, H, W), type int  
         results_training["training_metrics"][f"fold_{fold_nbr}"] = results_per_epoch
         file_path_results_training = f"/kaggle/working/training_metrics_{model_class.__name__}_{datetime.now().strftime('%m-%d_%H-%M')}_fold{fold_nbr}.pkl"
+        print(f"saving fold {fold_nbr} results to {file_path_results_training}")
         with open(file_path_results_training, 'wb') as f:
             pickle.dump(results_training, f)
     oof_preds_tensor = torch.concat(oof_preds)
