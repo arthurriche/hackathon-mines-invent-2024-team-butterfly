@@ -2,7 +2,7 @@ from enum import Enum, IntEnum
 from typing import Optional, Union
 
 import torch
-import torch.nn as nn 
+from torch import nn
 
 
 class ActivationFunction(str, Enum):
@@ -524,6 +524,7 @@ class UNet(nn.Module):
 
 
 
+
 class UnetWrapper(nn.Module):
     """
     Wrapper around the UNet Module to take the median of the outputs
@@ -561,3 +562,4 @@ class UnetWrapper(nn.Module):
         # output shape (B, 20, T, H, W)
         outputs_median_time = torch.median(output, dim=2)
         return outputs_median_time[0]  # Return the median values, not the indices
+
