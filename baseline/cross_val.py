@@ -122,8 +122,9 @@ def train_crossval_loop(
         for epoch in range(num_epochs):
             model.train()  # Set the model to training mode
             running_loss = 0.0
-
+            print(f"fold {fold_nbr} - epoch {epoch} - training batch [1/{len(dataloader_train)}]...")
             for batch_nbr, (inputs, targets) in tqdm(enumerate(dataloader_train), total=len(dataloader_train)):
+
                 # Move data to device
                 inputs_batch = inputs["S2"].to(device)  # Satellite data
                 targets = targets.to(device)
@@ -148,23 +149,24 @@ def train_crossval_loop(
             results_per_epoch["epoch"].append(epoch)
 
             # get the score for this epoch
-            if get_validation_loss_during_training and fold_nbr == 1 and epoch % 2 == 0: 
-                print(f"...running inference for validation loss and iou...")
-                dataloader_val = torch.utils.data.DataLoader(
-                    ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
-                )
-                outputs_tensor, targets = eval_loop(model, dataloader_val,device, debug =debug )
-                preds = torch.argmax(outputs_tensor, dim=1)
-                targets_flat_npy = targets.numpy().flatten()
-                preds_flat_npy = preds.numpy().flatten()
-                mean_iou_val_epoch= jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
-                print(f"Fold {fold_nbr}, Epoch {epoch} : Val IOU {mean_iou_val_epoch:.3f}, Val Loss {epoch_loss:.3f} ")
-                results_per_epoch["iou"].append(mean_iou_val_epoch)
-                if mean_iou_val_epoch  ==  max(results_per_epoch["iou"]):
-                    fold_preds = preds
-                """
-                If the score for this epoch is better than the last, then keep the preds for this epoch
-                """
+            if get_validation_loss_during_training:
+                if epoch == num_epochs -1 or  (fold_nbr == 0 and epoch % 2 == 0): 
+                    print(f"...running inference for validation loss and iou...")
+                    dataloader_val = torch.utils.data.DataLoader(
+                        ds_val, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
+                    )
+                    outputs_tensor, targets = eval_loop(model, dataloader_val,device, debug =debug )
+                    preds = torch.argmax(outputs_tensor, dim=1)
+                    targets_flat_npy = targets.numpy().flatten()
+                    preds_flat_npy = preds.numpy().flatten()
+                    mean_iou_val_epoch= jaccard_score(preds_flat_npy, targets_flat_npy, average="macro")
+                    print(f"Fold {fold_nbr}, Epoch {epoch} : Val IOU {mean_iou_val_epoch:.3f}, Val Loss {epoch_loss:.3f} ")
+                    results_per_epoch["iou"].append(mean_iou_val_epoch)
+                    if mean_iou_val_epoch  ==  max(results_per_epoch["iou"]):
+                        fold_preds = preds
+                    """
+                    If the score for this epoch is better than the last, then keep the preds for this epoch
+                    """
         # get validation loss 
         # N, H, W where N is the size of the validation fold 
         results_training["oof_preds"].append(fold_preds) # shape (N_fold, H, W), type int 
