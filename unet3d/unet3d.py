@@ -556,7 +556,7 @@ class UnetWrapper(nn.Module):
     def forward(self, x: torch.Tensor, debug : bool = False) -> torch.Tensor:
         # x is of shape (B, T,C, H, W)
         # but unet want (B,C,T,H,W)
-        output = self.unet(x.transpose(1,2))
+        output = self.unet(x)
         if debug : print(f"output unet {output.shape}")
         # output shape (B, 20, T, H, W)
         outputs_median_time = torch.median(output, dim=2)
