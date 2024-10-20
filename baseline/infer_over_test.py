@@ -8,8 +8,7 @@ from baseline.submission_tools import masks_to_str
 from baseline.dataset import OutputDataset
 from baseline.collate import pad_collate 
 from utils.model_io import load_full_model
-FILE_PATH = Path("outputs/SimpleSegmentationModelWrapper_10-18_22-33")
-assert FILE_PATH.exists()
+
 
 
 def model_inference(
@@ -52,6 +51,8 @@ def model_inference(
     return pd.DataFrame(res,columns=['ID','MASKS'])
 
 if __name__ == "__main__":
+    FILE_PATH = Path("outputs/SimpleSegmentationModelWrapper_10-18_22-33")
+    assert FILE_PATH.exists()
     model = load_full_model(file_path=FILE_PATH)
     data_folder = Path("DATA-mini")
     result = model_inference(model,data_folder)
