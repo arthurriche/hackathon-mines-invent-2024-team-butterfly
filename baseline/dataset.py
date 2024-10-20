@@ -120,13 +120,16 @@ class NoCloudDataset(torch.utils.data.Dataset):
 #Create an a dataset to get both the patches and the index for the test data.
 
 class OutputDataset(torch.utils.data.Dataset):
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, max_samples : int|None = None):
         super(OutputDataset, self).__init__()
         self.folder = folder
 
         # Get metadata
         print("Reading patch metadata ...")
         self.meta_patch = gpd.read_file(os.path.join(folder, "metadata.geojson"))
+        if max_samples is not None: 
+            self.meta_patch = self.meta_patch.sample(min(max_samples, self.meta_patch.shape[0]))
+
         self.meta_patch.index = self.meta_patch["ID"].astype(int)
         self.meta_patch.sort_index(inplace=True)
         print("Done.")
@@ -151,13 +154,15 @@ class OutputDataset(torch.utils.data.Dataset):
         return data
 
 class OutputNoCloudDataset(torch.utils.data.Dataset):
-    def __init__(self, folder: Path):
+    def __init__(self, folder: Path, max_samples : int|None = None):
         super(OutputNoCloudDataset, self).__init__()
         self.folder = folder
 
         # Get metadata
         print("Reading patch metadata ...")
         self.meta_patch = gpd.read_file(os.path.join(folder, "metadata.geojson"))
+        if max_samples is not None: 
+            self.meta_patch = self.meta_patch.sample(min(max_samples, self.meta_patch.shape[0]))
         self.meta_patch.index = self.meta_patch["ID"].astype(int)
         self.meta_patch.sort_index(inplace=True)
         print("Done.")

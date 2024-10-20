@@ -16,6 +16,8 @@ def model_inference(
     data_folder: Path,
     batch_size: int = 1,
     device: str = "cpu",
+    dataset_class = OutputDataset,
+    max_samples: int |None = None
 
 ) -> None:
     """
@@ -24,7 +26,7 @@ def model_inference(
     - model: the already-trained model. 
     """
     # Create data loader
-    dataset = OutputDataset(data_folder)
+    dataset = dataset_class(data_folder, max_samples = max_samples)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=False
     )
