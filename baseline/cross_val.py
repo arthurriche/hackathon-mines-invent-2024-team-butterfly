@@ -81,7 +81,7 @@ def train_crossval_loop(
     dataset_class = BaselineDataset,
     max_samples : int = None,
     debug : bool = False,
-    weights_criterion : torch.tensor|None= None,
+    weights_criterion : torch.Tensor|None= None,
     **model_kwargs  
 ):
     """
