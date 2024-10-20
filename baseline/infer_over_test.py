@@ -53,8 +53,10 @@ def model_inference(
 
 if __name__ == "__main__":
     model = load_full_model(file_path=FILE_PATH)
-    display(model)
     data_folder = Path("DATA-mini")
-    result = model_inference(model,data_folder )
+    result = model_inference(model,data_folder)
+    
+
+# %%
 
 # %%
