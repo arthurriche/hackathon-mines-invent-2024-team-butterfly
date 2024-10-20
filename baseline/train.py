@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
-
 from baseline.collate import pad_collate
 from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
@@ -60,27 +59,32 @@ def print_mean_iou(targets: torch.Tensor, preds: torch.Tensor) -> None:
 
 
 def train_model(
+    model : nn.Module,
     data_folder: Path,
     nb_classes: int,
-    input_channels: int,
     num_epochs: int = 10,
     batch_size: int = 4,
-    learning_rate: float = 1e-3,
+    learning_rate: float = 1e-3, # may need to add some weight decay
     device: str = "cpu",
     verbose: bool = False,
-) -> SimpleSegmentationModel:
+    max_samples : int|None = None,
+    dataset_class = BaselineDataset,
+    weights_criterion : torch.Tensor|None= None,
+
+) -> nn.Module:
     """
     Training pipeline.
+    Model: PyTorch model that takes input (B,T,C,H,W) and outputs (B,20,H,W)
     """
-    # Create data loader
-    dataset = BaselineDataset(data_folder)
+    dataset = dataset_class(data_folder,max_samples=max_samples)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
     )
-
-    # Initialize the model, loss function, and optimizer
-    model = SimpleSegmentationModel(input_channels, nb_classes)
-    criterion = nn.CrossEntropyLoss()
+    if weights_criterion is not None:
+        criterion = nn.CrossEntropyLoss(weight=weights_criterion)
+    else:
+        criterion = nn.CrossEntropyLoss()
+    # can make this weighted 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
     # Move the model to the appropriate device (GPU if available)
@@ -101,7 +105,7 @@ def train_model(
             optimizer.zero_grad()
 
             # Forward pass
-            outputs = model(inputs["S2"][:, 10, :, :, :])  # only use the 10th image
+            outputs = model(inputs["S2"]) # use the whole image (B, T, C, H, W)
 
             # Loss computation
             loss = criterion(outputs, targets)
@@ -133,15 +137,27 @@ def train_model(
 
 if __name__ == "__main__":
     # Example usage:
+    from unet3d.unet3d import UnetWrapper
+    model = UnetWrapper(
+        in_channels= 10 , 
+        out_channels= 20, 
+        dim = 3
+    )
+
     model = train_model(
+        model =  model,
         data_folder=Path(
-            "/Users/louis.stefanuto.c/Documents/pastis-benchmark-mines2024/DATA/TRAIN/"
+            "DATA-mini"
         ),
         nb_classes=20,
         input_channels=10,
-        num_epochs=100,
+        num_epochs=1,
         batch_size=32,
         learning_rate=1e-3,
         device="mps",
         verbose=True,
     )
+
+# %%
+
+# %%
