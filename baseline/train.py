@@ -62,18 +62,18 @@ def train_model(
     model : nn.Module,
     data_folder: Path,
     nb_classes: int,
-    input_channels: int,
     num_epochs: int = 10,
     batch_size: int = 4,
     learning_rate: float = 1e-3, # may need to add some weight decay
     device: str = "cpu",
     verbose: bool = False,
+    max_samples : int|None = None
 ) -> nn.Module:
     """
     Training pipeline.
     Model: PyTorch model that takes input (B,T,C,H,W) and outputs (B,20,H,W)
     """
-    dataset = BaselineDataset(data_folder)
+    dataset = BaselineDataset(data_folder,max_samples=max_samples)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
     )
