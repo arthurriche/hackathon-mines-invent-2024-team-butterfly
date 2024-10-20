@@ -71,13 +71,14 @@ def eval_loop(
 
 def train_crossval_loop(
     model_class : torch.nn.modules.module.Module,
-    data_folder: str, 
+    data_folder: str,
     num_folds : int = 5,
     num_epochs: int = 10,
     batch_size: int = 4,
     learning_rate: float = 1e-3,
     device: str = "cpu",
     get_validation_loss_during_training : bool = True,
+    dataset_class = BaselineDataset,
     max_samples : int = None,
     debug : bool = False,
     **model_kwargs  
@@ -91,7 +92,7 @@ def train_crossval_loop(
         data_folder
     )
     assert data_folder.exists()
-    dataset = BaselineDataset(data_folder, max_samples=max_samples)
+    dataset = dataset_class(data_folder, max_samples=max_samples)
     criterion = nn.CrossEntropyLoss()
     oof_preds = []
     validation_targets = []
@@ -127,12 +128,7 @@ def train_crossval_loop(
                 optimizer.zero_grad()
 
                 # outputs should be of shape (B, 20, H ,W)
-                if debug : 
-                    print(inputs_batch.shape )
                 outputs = model(inputs_batch, debug = debug) 
-                if debug : 
-                    print(outputs.shape)
-                raise ValueError
                 loss = criterion(outputs, targets)
 
                 # Backward pass and optimization

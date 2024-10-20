@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 from tqdm import tqdm
 
-
 from baseline.collate import pad_collate
 from baseline.dataset import BaselineDataset
 from baseline.model import SimpleSegmentationModel
@@ -152,3 +151,7 @@ if __name__ == "__main__":
         device="mps",
         verbose=True,
     )
+
+# %%
+
+# %%
