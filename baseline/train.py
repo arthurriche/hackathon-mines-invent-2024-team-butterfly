@@ -67,17 +67,23 @@ def train_model(
     learning_rate: float = 1e-3, # may need to add some weight decay
     device: str = "cpu",
     verbose: bool = False,
-    max_samples : int|None = None
+    max_samples : int|None = None,
+    dataset_class = BaselineDataset,
+    weights_criterion : torch.Tensor|None= None,
+
 ) -> nn.Module:
     """
     Training pipeline.
     Model: PyTorch model that takes input (B,T,C,H,W) and outputs (B,20,H,W)
     """
-    dataset = BaselineDataset(data_folder,max_samples=max_samples)
+    dataset = dataset_class(data_folder,max_samples=max_samples)
     dataloader = torch.utils.data.DataLoader(
         dataset, batch_size=batch_size, collate_fn=pad_collate, shuffle=True
     )
-    criterion = nn.CrossEntropyLoss()  
+    if weights_criterion is not None:
+        criterion = nn.CrossEntropyLoss(weight=weights_criterion)
+    else:
+        criterion = nn.CrossEntropyLoss()
     # can make this weighted 
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
 
